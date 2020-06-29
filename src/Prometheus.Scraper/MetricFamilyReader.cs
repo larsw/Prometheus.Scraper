@@ -2,8 +2,6 @@ using System.Text.RegularExpressions;
 using System.IO;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Optional;
 
 namespace Prometheus.Scraper
 {
@@ -25,19 +23,21 @@ namespace Prometheus.Scraper
             }
             var name = match.Groups["name"].Value;
             var value = match.Groups["value"].Value;
-            if (builder.IsNewFamily(name))
+            if (builder == null)
+            {
+                builder = new MetricFamilyBuilder(name);
+            }
+            else if (builder.IsNewFamily(name))
             {
                 var metricFamily = builder.Build();
                 builder = new MetricFamilyBuilder(name);
                 builder.SetHelp(value);
                 return metricFamily;
             }
-            builder.SetName(name);
             builder.SetHelp(value);
             return null;
         }
 
-// 
         private Regex TypeRegex = new Regex("^#\\s+TYPE\\s+(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\\s+(?<value>.*)", RegexOptions.Compiled);
         private MetricFamily IsType(ref MetricFamilyBuilder builder, string line)
         {
@@ -48,6 +48,10 @@ namespace Prometheus.Scraper
             }
             var name = match.Groups["name"].Value;
             var value = match.Groups["value"].Value;
+            if (builder == null)
+            {
+                builder = new MetricFamilyBuilder(name);
+            }
             if (builder.IsNewFamily(name))
             {
                 var metricFamily = builder.Build();
@@ -55,7 +59,6 @@ namespace Prometheus.Scraper
                 builder.SetType(value);
                 return metricFamily;
             }
-            builder.SetName(name);
             builder.SetType(value);
             return null;
         }
@@ -80,6 +83,10 @@ namespace Prometheus.Scraper
             var labels = match.Groups["labels"].Value;
             var value = match.Groups["value"].Value;
             
+            if (builder == null)
+            {
+                builder = new MetricFamilyBuilder(name);
+            }
             if (builder.IsNewFamily(name))
             {
                 var metricFamily = builder.Build();
@@ -94,7 +101,7 @@ namespace Prometheus.Scraper
         public IEnumerable<MetricFamily> ReadAllFamilies()
         {
             string line;
-            var builder = new MetricFamilyBuilder();
+            MetricFamilyBuilder builder = null;
             while ((line = _reader.ReadLine()) != null)
             {
                 line = line.Trim();

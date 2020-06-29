@@ -27,19 +27,19 @@ namespace Prometheus.Scraper
         private string _help;
         private List<Sample> _samples = new List<Sample>();
 
-        public void SetName(string name)
+        public MetricFamilyBuilder(string name)
         {
-            _name = name;
+            _name = name ?? throw new ArgumentNullException(nameof(name));
         }
 
         public void SetType(string type)
         {
-            _type = type;
+            _type = type ?? throw new ArgumentNullException(nameof(type));
         }
 
         public void SetHelp(string help)
         {
-            _help = help;
+            _help = help ?? throw new ArgumentNullException(nameof(help));
         }
 
         public void AddSample(string labels, string stringValue)
@@ -81,8 +81,6 @@ namespace Prometheus.Scraper
             if (stringValue == "-Inf") return double.MinValue;
             return double.Parse(stringValue);
         }
-        
-        // The _sum, _count, _bucket and _total 
 
         internal MetricFamily Build()
         {
