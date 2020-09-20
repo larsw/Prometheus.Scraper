@@ -8,14 +8,16 @@ namespace Prometheus.Scraper
 
     public class Sample
     {
-        public double Value {get;}
-        public IReadOnlyDictionary<string, string> Labels { get; }
+        public string Name { get; }
+        public double Value { get; }
+        public IDictionary<string, string> Labels { get; }
         public long? Timestamp { get; }
 
-        public Sample(double value, IDictionary<string, string> labels, long? timestamp)
+        public Sample(string name, double value, IDictionary<string, string> labels, long? timestamp)
         {
+            Name = name;
             Value = value;
-            Labels = new ReadOnlyDictionary<string, string>(labels);
+            Labels = labels;
             Timestamp = timestamp;
         }
     }
@@ -42,7 +44,7 @@ namespace Prometheus.Scraper
             _help = help ?? throw new ArgumentNullException(nameof(help));
         }
 
-        public void AddSample(string labels, string stringValue)
+        public void AddSample(string name, string labels, string stringValue)
         {
             var labelDict = ParseLabels(labels);
             var parts = stringValue.Split(' ');
@@ -52,7 +54,7 @@ namespace Prometheus.Scraper
             {
                 timestamp = ParseTimestamp(parts[1]);
             }
-            var sample = new Sample(value, labelDict, timestamp);
+            var sample = new Sample(name, value, labelDict, timestamp);
             _samples.Add(sample);
         }
 
@@ -84,7 +86,66 @@ namespace Prometheus.Scraper
 
         internal MetricFamily Build()
         {
-            return new MetricFamily(_name, _type, _help, _samples);
+            var metrics = new List<Metric>();
+            switch(_type)
+            {
+                case "summary":
+                    metrics.AddRange(ToSummaries(_samples));
+                    break;
+                case "counter":
+                    metrics.AddRange(ToCounters(_samples));
+                    break;
+                case "gauge":
+                    metrics.AddRange(ToGauges(_samples));
+                    break;
+                case "histogram":
+                    metrics.AddRange(ToHistograms(_samples));
+                    break;
+                default:
+                    metrics.AddRange(ToUntyped(_samples));
+                    break;
+            }
+            if (!Enum.TryParse<MetricType>(_type, true, out var typeAsEnum))
+            {
+                throw new InvalidOperationException($"Unknown metric type: {_type}");
+            }
+            return new MetricFamily(_name, typeAsEnum, _help, metrics);
+        }
+
+        private IList<Metric> ToSummaries(IList<Sample> samples)
+        {
+            return new List<Metric>();
+        }
+
+        private IList<Metric> ToCounters(IList<Sample> samples)
+        {
+            return samples.Select(x => {
+                return new Counter(x.Labels, x.Value);
+            })
+            .Cast<Metric>()
+            .ToList();
+        }
+
+        private IList<Metric> ToGauges(IList<Sample> samples)
+        {
+            return samples.Select(x => {
+                return new Gauge(x.Labels, x.Value);
+            })
+            .Cast<Metric>()
+            .ToList();
+        }
+
+        private IList<Metric> ToHistograms(IList<Sample> samples)
+        {
+            var sumSample = samples.Single(x => x.Name.EndsWith("_sum"));
+            var countSample = samples.Single(x => x.Name.EndsWith("_count"));
+            
+            return new List<Metric>();
+        }
+
+        private IList<Metric> ToUntyped(IList<Sample> samples)
+        {
+            return new List<Metric>();
         }
 
         readonly string[] SuffixesToStrip = new string[] 

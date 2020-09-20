@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Prometheus.Scraper
+﻿namespace Prometheus.Scraper
 {
     public enum MetricType
     {

@@ -1,19 +1,25 @@
-using System.Text.RegularExpressions;
-using System.IO;
-using System;
-using System.Collections.Generic;
-
 namespace Prometheus.Scraper
 {
+    using System;
+    using System.Text.RegularExpressions;
+    using System.IO;
+    using System.Collections.Generic;
+
     public class PlainTextMetricsReader : IDisposable
     {
+        private static readonly Regex HelpRegex = new Regex("^#\\s+HELP\\s+(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\\s+(?<value>.*)", RegexOptions.Compiled);
+        private static readonly Regex TypeRegex = new Regex("^#\\s+TYPE\\s+(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\\s+(?<value>.*)", RegexOptions.Compiled);
+        private static readonly Regex SampleRegex = new Regex("(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?<labels>\\{.*\\})?\\s+(?<value>.*)", RegexOptions.Compiled);
+        private static readonly Regex CommentOrWhitespaceRegex = new Regex("(^#.*|\\s*)", RegexOptions.Compiled);
+
         private readonly TextReader _reader;
+        private bool _disposed;
+
         public PlainTextMetricsReader(TextReader reader)
         {
             _reader = reader;
         }
 
-        private Regex HelpRegex = new Regex("^#\\s+HELP\\s+(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\\s+(?<value>.*)", RegexOptions.Compiled);
         private MetricFamily IsHelp(ref MetricFamilyBuilder builder, string line)
         {
             var match = HelpRegex.Match(line);
@@ -38,7 +44,6 @@ namespace Prometheus.Scraper
             return null;
         }
 
-        private Regex TypeRegex = new Regex("^#\\s+TYPE\\s+(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\\s+(?<value>.*)", RegexOptions.Compiled);
         private MetricFamily IsType(ref MetricFamilyBuilder builder, string line)
         {
             var match = TypeRegex.Match(line);
@@ -63,14 +68,11 @@ namespace Prometheus.Scraper
             return null;
         }
 
-        private Regex CommentOrWhitespaceRegex = new Regex("(^#.*|\\s*)", RegexOptions.Compiled);
         public bool IsCommentOrWhitespace(string line)
         {
             return CommentOrWhitespaceRegex.IsMatch(line);
         }
 
-
-        private Regex SampleRegex = new Regex("(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?<labels>\\{.*\\})?\\s+(?<value>.*)", RegexOptions.Compiled);
         private MetricFamily IsSample(ref MetricFamilyBuilder builder, string line)
         {
             var match = SampleRegex.Match(line);
@@ -91,10 +93,10 @@ namespace Prometheus.Scraper
             {
                 var metricFamily = builder.Build();
                 builder = new MetricFamilyBuilder(name);
-                builder.AddSample(labels, value);
+                builder.AddSample(name, labels, value);
                 return metricFamily;
             }
-            builder.AddSample(labels, value);
+            builder.AddSample(name, labels, value);
             return null;
         }
 
@@ -138,8 +140,6 @@ namespace Prometheus.Scraper
             yield return builder.Build();
         }
 
-        private bool _disposed;
-
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)
@@ -154,7 +154,6 @@ namespace Prometheus.Scraper
 
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
